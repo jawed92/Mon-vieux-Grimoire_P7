@@ -1,52 +1,21 @@
-const http = require("http");
-const app = require("./app");
-const cors = require("cors");
+const express = require("express");
+const connectDB = require("./dataBase/mongodb");
+require("dotenv").config();
+const path = require("path");
+connectDB();
+const server = express();
+const { cors } = require("./middleware/cors");
+const port = process.env.PORT;
 
-const normalizePort = (val) => {
-	const port = parseInt(val, 10);
+// MIDDLEWARES
+server.use(cors);
+server.use(express.json());
+server.use(express.urlencoded({ extended: false }));
+server.use("/images", express.static(path.join(__dirname, "images")));
 
-	if (isNaN(port)) {
-		return val;
-	}
-	if (port >= 0) {
-		return port;
-	}
-	return false;
-};
-const port = normalizePort(process.env.PORT || "4000");
-app.set("port", port);
+// ATTRIBUER LES ROUTES
+server.use("/api/books", require("./routes/book"));
+server.use("/api/auth", require("./routes/user"));
 
-const errorHandler = (error) => {
-	if (error.syscall !== "listen") {
-		throw error;
-	}
-	const address = server.address();
-	const bind =
-		typeof address === "string" ? "pipe " + address : "port: " + port;
-	switch (error.code) {
-		case "EACCES":
-			console.error(bind + " requires elevated privileges.");
-			process.exit(1);
-			break;
-		case "EADDRINUSE":
-			console.error(bind + " is already in use.");
-			process.exit(1);
-			break;
-		default:
-			throw error;
-	}
-};
-
-const server = http.createServer(app);
-
-server.on("error", errorHandler);
-server.on("listening", () => {
-	const address = server.address();
-	const bind = typeof address === "string" ? "pipe " + address : "port " + port;
-	console.log("Listening on " + bind);
-});
-
-// Configurez CORS après avoir créé le serveur HTTP
-app.use(cors());
-
-server.listen(port);
+// LANCER LE SERVEUR
+server.listen(port, () => console.log("~> Serveur lancé sur le port " + port));

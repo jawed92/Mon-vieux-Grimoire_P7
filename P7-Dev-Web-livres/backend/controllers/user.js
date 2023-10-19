@@ -2,22 +2,34 @@ require("dotenv").config();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
-const User = require("../models/User");
+const User = require("../models/user");
 
-exports.signup = (req, res, next) => {
-	bcrypt
-		.hash(req.body.password, 10)
-		.then((hash) => {
-			const user = new User({
-				email: req.body.email,
-				password: hash,
-			});
-			user
-				.save()
-				.then(() => res.status(201).json({ message: "Utilisateur créé !" }))
-				.catch((error) => res.status(400).json({ error }));
-		})
-		.catch((error) => res.status(500).json({ error }));
+// exports.signup = (req, res, next) => {
+// 	bcrypt
+// 		.hash(req.body.password, 10)
+// 		.then((hash) => {
+// 			const user = new User({
+// 				email: req.body.email,
+// 				password: hash,
+// 			});
+// 			user
+// 				.save()
+// 				.then(() => res.status(201).json({ message: "Utilisateur créé !" }))
+// 				.catch((error) => res.status(400).json({ error }));
+// 		})
+// 		.catch((error) => res.status(500).json({ error }));
+// };
+
+exports.signup = async (req, res) => {
+	const { email, password } = req.body;
+	try {
+		const hashedPassword = await bcrypt.hash(password, 10);
+		const user = new User({ email, password: hashedPassword });
+		await user.save();
+		res.json({ message: "Utilisateur inscrit avec succès!" });
+	} catch (error) {
+		res.status(500).json({ message: "Erreur lors de l'inscription." });
+	}
 };
 
 exports.login = (req, res, next) => {

@@ -18,4 +18,24 @@ const storage = multer.diskStorage({
 	},
 });
 
-module.exports = multer({ storage: storage }).single("image");
+const upload = multer({ storage: storage }).single("image");
+
+// UPLOADER L'IMAGE
+const imageUploader = (req, res, next) => {
+	upload(req, res, function (err) {
+		if (err instanceof multer.MulterError) {
+			return res.status(400).json({
+				message: "Une erreur est survenue lors de l'upload du fichier.",
+			});
+		} else if (err) {
+			return res.status(400).json({
+				message: "Une erreur est survenue lors de l'upload du fichier.",
+			});
+		}
+		next();
+	});
+};
+
+module.exports = {
+	imageUploader,
+};

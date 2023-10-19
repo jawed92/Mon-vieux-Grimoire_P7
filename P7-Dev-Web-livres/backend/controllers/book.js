@@ -1,257 +1,219 @@
 const Thing = require("../models/Thing");
-const User = require("../models/User");
-const fs = require("fs");
+const { imageEraser } = require("../middleware/imageEraser");
 
-exports.createBook = (req, res, next) => {
+// OBTENIR LES BOOKS
+module.exports.getAllBook = async (req, res) => {
 	try {
-		// Assurez-vous que les données sont correctement extraites du corps de la requête
-		const { title, author, year, genre, ratings } = req.body;
-
-		// Vérifiez que toutes les données requises sont présentes
-		if (!title || !author || !year || !genre || !ratings) {
-			return res.status(400).json({ error: "Données manquantes" });
+		const books = await Thing.find();
+		// VERIFIER QUE LES BOOKS ONT ETE TROUVE
+		if (!books) {
+			res.status(400).json({ message: "Problême d'acquisition de la DB" });
 		}
-
-		// Calculez la note moyenne à partir des notations
-		let ratingFinal = 0;
-		ratings.forEach(function (ratingObject) {
-			ratingFinal += ratingObject.grade;
+		// SI LA LISTE NE CONTIENT PAS DE BOOK
+		if (books.length === 0) {
+			res
+				.status(204)
+				.json({ message: "la DB ne possède pour l'instant aucun livres" });
+		} else {
+			// ENVOI VERS LE FRONT DE LA LISTE DE BOOK
+			res.status(200).json(books);
+		}
+		// GESTION DES ERREURS
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({
+			message: "Une erreur s'est produite lors de la récupération des livres",
+			err: err,
 		});
-		ratingFinal /= ratings.length;
-		console.log("ratings:", ratings, "ratingFinal:", ratingFinal);
+	}
+};
 
-		// Obtenez l'ID de l'utilisateur à partir du token d'authentification
-		const userId = req.auth.userId;
+// OBTENIR UN BOOK
+module.exports.getBook = async (req, res) => {
+	try {
+		const book = await Thing.findById(req.params.id);
+		// VERIFIER QUE LE BOOK EST TROUVE
+		if (!book) {
+			res.status(404).json({ message: "aucun livre ne correspond à cet id" });
+		} else {
+			// ENVOI AU FRONT LE BOOK TROUVE
+			res.status(200).json(book);
+		}
+		// GESTION DES ERREURS
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({
+			message: "Une erreur s'est produite lors de la récupération du livre",
+			err: err,
+		});
+	}
+};
 
-		// Créez un nouvel objet Thing à partir des données
-		const thing = new Thing({
+// OBTENIR LES 3 MEILLEURS BOOKS
+module.exports.getBestBooks = async (req, res) => {
+	try {
+		// TROUVER LES 3 BOOKS LES MIEUX NOTES
+		const bestBooks = await Thing.find().sort({ averageRating: -1 }).limit(3);
+		// ENVOIR AU FRONT DU CLASSEMENT
+		res.status(200).json(bestBooks);
+		// GESTION DES ERREURS
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({
+			message: "Une erreur s'est produite lors de la récupération du livre",
+			err: err,
+		});
+	}
+};
+
+// CREATION D'UN BOOK
+module.exports.createBook = async (req, res) => {
+	try {
+		// VERIFICATION DE LA PRESENCE D'UN CONTENU
+		if (!req.body) {
+			return res
+				.status(400)
+				.json({ message: "Votre requête ne contient aucun livre" });
+		}
+		// EXTRACTION DES DONNEES DU FORMDATA
+		const bookData = JSON.parse(req.body.book);
+		const { userId, title, author, year, genre, ratings } = bookData;
+		let imageUrl = "";
+		// STOCKAGE DE L'URL DE L'IMAGE
+		if (req.file) {
+			imageUrl = `${req.protocol}://${req.get("host")}/images/${
+				req.file.filename
+			}`;
+		}
+		// CREATION D'UN NOUVEAU BOOK
+		const newBook = new Thing({
+			userId,
 			title,
 			author,
 			year,
 			genre,
+			imageUrl,
 			ratings,
-			averageRating: ratingFinal, // Assurez-vous d'enregistrer la note moyenne correctement
-			userId, // Assurez-vous que l'ID de l'utilisateur est correctement attribué
-			imageUrl: req.file
-				? `${req.protocol}://${req.get("host")}/images/${req.file.filename}`
-				: null,
 		});
-
-		// Enregistrez l'objet Thing dans la base de données
-		thing
-			.save()
-			.then(() => {
-				res.status(201).json({ message: "Livre enregistré avec succès !" });
-			})
-			.catch((error) => {
-				res.status(400).json({ error });
-			});
-	} catch (error) {
-		res.status(500).json({ error });
-	}
-};
-
-exports.getBook = (req, res, next) => {
-	Thing.findOne({
-		_id: req.params.id,
-	})
-		.then((thing) => {
-			res.status(200).json(thing);
-		})
-		.catch((error) => {
-			res.status(404).json({
-				error: error,
-			});
-		});
-};
-
-exports.rateBook = (req, res, next) => {
-	const bookId = req.params.id; // ID du livre à noter
-	const { grade } = req.body; // Note attribuée
-
-	// Vérifiez que la note est valide (par exemple, entre 1 et 5)
-	if (grade < 1 || grade > 5) {
-		return res.status(400).json({ error: "La note doit être entre 1 et 5." });
-	}
-
-	// Vous devrez ajouter la logique pour ajouter la note au livre spécifié par ID
-	// Assurez-vous de mettre à jour la moyenne de notation du livre
-
-	// Exemple de logique (à personnaliser en fonction de votre modèle de données) :
-	Book.findById(bookId)
-		.then((book) => {
-			if (!book) {
-				return res.status(404).json({ error: "Livre non trouvé." });
-			}
-
-			// Ajoutez la note au livre et mettez à jour la moyenne
-			book.ratings.push({ userId: req.auth.userId, grade });
-			const totalRating = book.ratings.reduce(
-				(sum, rating) => sum + rating.grade,
-				0
-			);
-			book.averageRating = totalRating / book.ratings.length;
-
-			// Enregistrez le livre mis à jour dans la base de données
-			return book.save();
-		})
-		.then(() => {
-			res.status(200).json({ message: "Note ajoutée avec succès." });
-		})
-		.catch((error) => {
-			res.status(500).json({ error: "Erreur lors de l'ajout de la note." });
-		});
-};
-
-exports.updateBook = (req, res, next) => {
-	const thingObject = req.file
-		? {
-				...JSON.parse(req.body.thing),
-				imageUrl: `${req.protocol}://${req.get("host")}/images/${
-					req.file.filename
-				}`,
-		  }
-		: { ...req.body };
-
-	delete thingObject._userId;
-	Thing.findOne({ _id: req.params.id })
-		.then((thing) => {
-			if (thing.userId != req.auth.userId) {
-				res.status(401).json({ message: "Not authorized" });
-			} else {
-				Thing.updateOne(
-					{ _id: req.params.id },
-					{ ...thingObject, _id: req.params.id }
-				)
-					.then(() => res.status(200).json({ message: "Objet modifié!" }))
-					.catch((error) => res.status(401).json({ error }));
-			}
-		})
-		.catch((error) => {
-			res.status(400).json({ error });
-		});
-};
-
-exports.deleteBook = (req, res, next) => {
-	const thingId = req.params.id;
-	console.log("Thing ID:", thingId);
-
-	// Rechercher l'objet dans la base de données
-	Thing.findOne({ _id: thingId })
-		.then((thing) => {
-			console.log("Thing trouvé dans la base de données :", thing);
-
-			// Vérifiez si l'objet thing existe
-			if (thing === null || thing === undefined) {
-				console.log("Objet non trouvé dans la base de données.");
-				return res.status(404).json({ message: "Objet non trouvé." });
-			}
-
-			// Convertir thing en un objet JavaScript plain (POJO)
-			const thingData = thing.toObject();
-
-			console.log("Objet trouvé dans la base de données:", thingData);
-			console.log("req.auth.userId :", req.auth.userId);
-
-			if (!thingData.userId) {
-				console.log("Erreur: L'objet n'a pas de propriété 'userId'.");
-				return res
-					.status(404)
-					.json({ message: "Propriété 'userId' manquante." });
-			}
-
-			if (req.auth.userId !== thingData.userId) {
-				console.log("Utilisateur non autorisé à supprimer l'objet.");
-				return res.status(401).json({ message: "Non autorisé." });
-			}
-
-			const filename = thing.imageUrl.split("/images/")[1];
-			console.log("Nom du fichier image à supprimer:", filename);
-
-			// Supprimer le fichier image
-			fs.unlink(`images/${filename}`, (error) => {
-				if (error) {
-					console.error(
-						"Erreur lors de la suppression du fichier image:",
-						error
-					);
-					return res
-						.status(500)
-						.json({ error: "Erreur lors de la suppression du fichier image." });
-				}
-
-				console.log("Fichier image supprimé avec succès.");
-
-				// Supprimer l'objet de la base de données
-				Thing.deleteOne({ _id: thingId })
-					.then(() => {
-						console.log("Objet supprimé avec succès.");
-						res.status(200).json({ message: "Objet supprimé !" });
-					})
-					.catch((error) => {
-						console.error("Erreur lors de la suppression de l'objet:", error);
-						res
-							.status(500)
-							.json({ error: "Erreur lors de la suppression de l'objet." });
-					});
-			});
-		})
-		.catch((error) => {
-			console.error("Erreur lors de la recherche de l'objet:", error);
-			res
-				.status(500)
-				.json({ error: "Erreur lors de la recherche de l'objet." });
-		});
-};
-
-exports.getAllBook = (req, res, next) => {
-	Thing.find()
-
-		.then((things) => {
-			res.status(200).json(things);
-		})
-		.catch((error) => {
-			res.status(400).json({
-				error: error,
-			});
-		});
-};
-
-exports.getBestRatedBooks = async (req, res, next) => {
-	try {
-		// Récupérez tous les livres de votre base de données
-		const things = await Thing.find();
-
-		// Filtrer les livres déjà notés par l'utilisateur actuel
-		const userId = req.auth.userId; // Obtenez l'ID de l'utilisateur actuel depuis le token d'authentification
-
-		// Récupérez les notations de l'utilisateur actuel
-		const user = await User.findById(userId).populate("ratings.book");
-
-		if (!user) {
-			return res.status(404).json({ error: "Utilisateur non trouvé." });
-		}
-
-		const userRatedBooks = user.ratings.map((rating) => rating.book);
-
-		// Triez les livres par note moyenne, excluant ceux déjà notés par l'utilisateur
-		const sortedBooks = things
-			.filter((thing) => !userRatedBooks.includes(thing))
-			.sort((a, b) => b.averageRating - a.averageRating);
-
-		// Renvoyez les n premiers livres les mieux notés
-		const n = 10; // Vous pouvez ajuster n selon le nombre de livres que vous souhaitez renvoyer
-
-		const bestRatedBooks = sortedBooks.slice(0, n);
-
-		res.status(200).json(bestRatedBooks);
-	} catch (error) {
-		console.error(
-			"Erreur lors de la récupération des livres les mieux notés :",
-			error
-		);
+		// CALCULER AVERAGERATING
+		const grades = newBook.ratings.map((rating) => rating.grade);
+		const average =
+			grades.reduce((total, grade) => total + grade, 0) / grades.length;
+		newBook.averageRating = parseFloat(average.toFixed(1));
+		// ENVOI DU NOUVEAU BOOK DANS LA DB
+		const createdBook = await newBook.save();
+		res
+			.status(201)
+			.json({ message: "Nouveau livre enregistré", book: createdBook });
+		// GESTION DES ERREURS
+	} catch (err) {
 		res.status(500).json({
-			error: "Erreur lors de la récupération des livres les mieux notés.",
+			message: "Une erreur s'est produite lors de la création du livre",
+			err: err,
+		});
+	}
+};
+
+// MODIFIER UN BOOK
+module.exports.updateBook = async (req, res) => {
+	try {
+		const bookId = req.params.id;
+		const book = await Thing.findById(bookId);
+		// VERIFIER SI LE BOOK EST TROUVE
+		if (!book) {
+			return res.status(404).json({ message: "Livre introuvable" });
+		}
+		// EXTRACTION DES DONNEES DU BODY
+		const { userId, title, author, year, genre } = req.body;
+		let imageUrl = book.imageUrl;
+		// STOCKAGE DE L'URL DE L'IMAGE
+		if (req.file) {
+			imageEraser(imageUrl);
+			imageUrl = `${req.protocol}://${req.get("host")}/images/${
+				req.file.filename
+			}`;
+		}
+		// MISE A JOUR DU BOOK
+		book.userId = userId;
+		book.title = title;
+		book.author = author;
+		book.year = year;
+		book.genre = genre;
+		book.imageUrl = imageUrl;
+		// ENVOI DU BOOK ACTUALISE DANS LA DB
+		await Thing.findByIdAndUpdate(bookId, book);
+		res.status(200).json({
+			message: "Livre mis à jour",
+			book: book,
+		});
+		// GESTION DES ERREURS
+	} catch (err) {
+		console.log(err);
+		res.status(500).json({
+			message: "Une erreur s'est produite lors de la mise à jour du livre",
+			err: err,
+		});
+	}
+};
+
+// SUPPRIMER UN BOOK
+module.exports.deleteBook = async (req, res) => {
+	try {
+		const bookToDelete = await Thing.findById(req.params.id);
+		// VERIFIER QUE LE BOOK A SUPPRIMER EXISTE
+		if (!bookToDelete) {
+			console.log("livre pas trouvé");
+		} else {
+			// SUPPRESSION DU BOOK ET DE L'IMAGE ASSOCIEE
+			await Thing.findOneAndRemove({ _id: req.params.id });
+			imageEraser(bookToDelete.imageUrl);
+			res.status(202).json({ message: "livre supprimé" });
+		}
+		// GESTION DES ERREURS
+	} catch (err) {
+		// GESTION DES ERREURS
+		console.error(err);
+		res.status(500).json({
+			error: "Une erreur est survenue lors de la suppression du livre",
+		});
+	}
+};
+
+// NOTER UN BOOK
+module.exports.rateBook = async (req, res) => {
+	try {
+		// VERIFIER QUE LE BODY CONTIENT UNE DATA
+		if (!req.body) {
+			return res
+				.status(400)
+				.json({ message: "Votre requête ne contient aucune note" });
+		}
+		// EXTRAIRE LES DATA
+		const { userId, rating } = req.body;
+		const bookToRate = await Thing.findById(req.params.id);
+		// VERIFIER SI L'UTILISATEUR A DEJA NOTE LE BOOK
+		if (
+			bookToRate.ratings.some((rating) => {
+				return rating.userId === userId;
+			})
+		) {
+			res.status(400).json({ message: "Vous avez déjà noté ce livre" });
+		}
+		// AJOUTER LA NOUVELLE NOTE
+		bookToRate.ratings.push({ userId: userId, grade: rating });
+		// CALCULER AVERAGERATING
+		const grades = bookToRate.ratings.map((rating) => rating.grade);
+		const average =
+			grades.reduce((total, grade) => total + grade, 0) / grades.length;
+		bookToRate.averageRating = parseFloat(average.toFixed(1));
+		// ACTUALISATION DU BOOK DANS LA DB
+		await bookToRate.save();
+		res.status(200).json(bookToRate);
+	} catch (err) {
+		// GESTION DES ERREURS
+		console.error(err);
+		res.status(500).json({
+			error: "Une erreur est survenue lors de la mise à jour de la note",
 		});
 	}
 };
