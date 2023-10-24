@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { tokenChecker } = require("../middleware/auth");
-const { imageUploader } = require("../middleware/multer-config");
+const { imageUploader, imageResizer } = require("../middleware/multer-config");
 const {
 	getAllBook,
 	getBook,
@@ -15,8 +15,8 @@ const {
 router.get("/", getAllBook);
 router.get("/bestrating", getBestBooks);
 router.get("/:id", getBook);
-router.post("/", tokenChecker, imageUploader, createBook);
-router.put("/:id", tokenChecker, imageUploader, updateBook);
+router.post("/", tokenChecker, imageUploader, imageResizer, createBook);
+router.put("/:id", tokenChecker, imageUploader, imageResizer, updateBook);
 router.delete("/:id", tokenChecker, deleteBook);
 router.post("/:id/rating", tokenChecker, rateBook);
 

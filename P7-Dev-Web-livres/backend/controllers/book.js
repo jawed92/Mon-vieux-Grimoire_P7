@@ -190,7 +190,7 @@ module.exports.rateBook = async (req, res) => {
 		}
 		// EXTRAIRE LES DATA
 		const { userId, rating } = req.body;
-		const bookToRate = await Thing.findById(req.params.id);
+		const bookToRate = await Thing.findById(req.params.id); //id represente id du livre dans la requete (route book)
 		// VERIFIER SI L'UTILISATEUR A DEJA NOTE LE BOOK
 		if (
 			bookToRate.ratings.some((rating) => {

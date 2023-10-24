@@ -36,6 +36,33 @@ const imageUploader = (req, res, next) => {
 	});
 };
 
+// REDIMENTIONNER L'IMAGE
+const imageResizer = (req, res, next) => {
+	if (!req.file) {
+		return next();
+	}
+
+	const filePath = req.file.path;
+
+	sharp(filePath)
+		.resize({ width: 400 })
+		.toBuffer()
+		.then((data) => {
+			sharp(data)
+				.toFile(filePath)
+				.then(() => {
+					next();
+				})
+				.catch((err) => {
+					next(err);
+				});
+		})
+		.catch((err) => {
+			next(err);
+		});
+};
+
 module.exports = {
 	imageUploader,
+	imageResizer,
 };
