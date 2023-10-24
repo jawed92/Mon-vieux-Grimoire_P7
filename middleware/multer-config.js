@@ -1,4 +1,5 @@
 const multer = require("multer");
+const sharp = require("sharp");
 
 const MIME_TYPES = {
 	"image/jpg": "jpg",
@@ -64,5 +65,5 @@ const imageResizer = (req, res, next) => {
 
 module.exports = {
 	imageUploader,
-	imageResizer,
+	imageResizer
 };
