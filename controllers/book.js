@@ -1,10 +1,10 @@
-const Thing = require("../models/Thing");
+const Book = require("../models/Book");
 const { imageEraser } = require("../middleware/imageEraser");
 
 // OBTENIR LES BOOKS
 module.exports.getAllBook = async (req, res) => {
 	try {
-		const books = await Thing.find();
+		const books = await Book.find();
 		// VERIFIER QUE LES BOOKS ONT ETE TROUVE
 		if (!books) {
 			res.status(400).json({ message: "Problême d'acquisition de la DB" });
@@ -31,7 +31,7 @@ module.exports.getAllBook = async (req, res) => {
 // OBTENIR UN BOOK
 module.exports.getBook = async (req, res) => {
 	try {
-		const book = await Thing.findById(req.params.id);
+		const book = await Book.findById(req.params.id);
 		// VERIFIER QUE LE BOOK EST TROUVE
 		if (!book) {
 			res.status(404).json({ message: "aucun livre ne correspond à cet id" });
@@ -53,7 +53,7 @@ module.exports.getBook = async (req, res) => {
 module.exports.getBestBooks = async (req, res) => {
 	try {
 		// TROUVER LES 3 BOOKS LES MIEUX NOTES
-		const bestBooks = await Thing.find().sort({ averageRating: -1 }).limit(3);
+		const bestBooks = await Book.find().sort({ averageRating: -1 }).limit(3);
 		// ENVOIR AU FRONT DU CLASSEMENT
 		res.status(200).json(bestBooks);
 		// GESTION DES ERREURS
@@ -86,7 +86,7 @@ module.exports.createBook = async (req, res) => {
 			}`;
 		}
 		// CREATION D'UN NOUVEAU BOOK
-		const newBook = new Thing({
+		const newBook = new Book({
 			userId,
 			title,
 			author,
@@ -119,7 +119,7 @@ module.exports.updateBook = async (req, res) => {
 	try {
 		req.body.book = JSON.parse(req.body.book) //conversion en json manuellement body.book= string??todo
 		const bookId = req.params.id;
-		const book = await Thing.findById(bookId);
+		const book = await Book.findById(bookId);
 		// VERIFIER SI LE BOOK EST TROUVE
 		if (!book) {
 			return res.status(404).json({ message: "Livre introuvable" });
@@ -142,7 +142,7 @@ module.exports.updateBook = async (req, res) => {
 		book.genre = genre;
 		book.imageUrl = imageUrl;
 		// ENVOI DU BOOK ACTUALISE DANS LA DB
-		await Thing.findByIdAndUpdate(bookId, book);
+		await Book.findByIdAndUpdate(bookId, book);
 		console.log(title);
 		res.status(200).json({
 			message: "Livre mis à jour",
@@ -161,13 +161,13 @@ module.exports.updateBook = async (req, res) => {
 // SUPPRIMER UN BOOK
 module.exports.deleteBook = async (req, res) => {
 	try {
-		const bookToDelete = await Thing.findById(req.params.id);
+		const bookToDelete = await Book.findById(req.params.id);
 		// VERIFIER QUE LE BOOK A SUPPRIMER EXISTE
 		if (!bookToDelete) {
 			console.log("livre pas trouvé");
 		} else {
 			// SUPPRESSION DU BOOK ET DE L'IMAGE ASSOCIEE
-			await Thing.findOneAndRemove({ _id: req.params.id });
+			await Book.findOneAndRemove({ _id: req.params.id });
 			imageEraser(bookToDelete.imageUrl);
 			res.status(202).json({ message: "livre supprimé" });
 		}
@@ -192,7 +192,7 @@ module.exports.rateBook = async (req, res) => {
 		}
 		// EXTRAIRE LES DATA
 		const { userId, rating } = req.body;
-		const bookToRate = await Thing.findById(req.params.id); //id represente id du livre dans la requete (route book)
+		const bookToRate = await Book.findById(req.params.id); //id represente id du livre dans la requete (route book)
 		// VERIFIER SI L'UTILISATEUR A DEJA NOTE LE BOOK
 		if (
 			bookToRate.ratings.some((rating) => {
