@@ -1,50 +1,58 @@
-require("dotenv").config();
 const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
+const UserModel = require("../models/user");
+const { tokenMaker } = require("../middleware/auth");
 
-const User = require("../models/user");
-
-exports.signup = async (req, res) => {
-	const { email, password } = req.body;
-	try {
-		const hashedPassword = await bcrypt.hash(password, 10);
-		const user = new User({ email, password: hashedPassword });
-		await user.save();
-		res.json({ message: "Utilisateur inscrit avec succès!" });
-	} catch (error) {
-		res.status(500).json({ message: "Erreur lors de l'inscription." });
-	}
+// CREER UN UTILISATEUR
+module.exports.signup = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    // VERIFIER SI L'UTILISATEUR EXISTE DEJA DANS LA BASE DE DONNE
+    const checkedUserMail = await UserModel.findOne({ email });
+    if (checkedUserMail) {
+      return res
+        .status(400)
+        .json({ message: "Cette adresse mail est déjà utilisée !" });
+    }
+    // CREER UN UTILISATEUR
+    const newUser = new UserModel({ email, password });
+    await newUser.save();
+    res.status(201).json({ message: "Utilisateur créé avec succès" });
+  } catch (err) {
+    // GESTION DES ERREURS
+    console.error(err);
+    res.status(500).json({
+      message: "Une erreur s'est produite lors de la création de votre compte",
+      err: err,
+    });
+  }
 };
 
-exports.login = (req, res, next) => {
-	User.findOne({ email: req.body.email })
-		.then((user) => {
-			if (!user) {
-				return res.status(401).json({ error: "Utilisateur non trouvé !" });
-			}
-			bcrypt
-				.compare(req.body.password, user.password)
-				.then((valid) => {
-					if (!valid) {
-						return res.status(401).json({ error: "Mot de passe incorrect !" });
-					}
-					console.log("connect");
-					const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-						expiresIn: "24h",
-					});
-					res.status(200).json({
-						userId: user._id,
-						token: token,
-					});
-					console.log("ok");
-				})
-				.catch((error) => {
-					console.error(error);
-					res.status(500).json({ error: "Erreur interne du serveur" });
-				});
-		})
-		.catch((error) => {
-			console.error(error);
-			res.status(500).json({ error: "Erreur interne du serveur" });
-		});
+// CONNECTER UN UTILISATEUR
+module.exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    // VERIFIER L'EXISTENCE DE L'UTILISATEUR DANS LA DB
+    const user = await UserModel.findOne({ email: email });
+    if (!user) {
+      return res.status(401).json({ message: "email / mdp incorrects" });
+    }
+    // VERIFIER SI LE MOT DE PASSE EST CORRECT
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
+      return res.status(401).json({ message: "email / mdp incorrects" });
+    }
+    // GENERER LE TOKEN
+    const token = tokenMaker(user._id);
+    res.status(200).json({
+      userId: user._id,
+      token: token,
+    });
+  } catch (err) {
+    // GESTION DES ERREURS
+    console.error(err);
+    res.status(500).json({
+      message: "Une erreur s'est produite lors de votre tentative de connexion",
+      err: err,
+    });
+  }
 };
