@@ -115,35 +115,42 @@ module.exports.createBook = async (req, res) => {
 };
 
 // MODIFIER UN BOOK
+
 module.exports.updateBook = async (req, res) => {
 	try {
-		req.body.book = JSON.parse(req.body.book) //conversion en json manuellement body.book= string??todo
+		if (typeof req.body.book === 'string') {
+			req.body.book = JSON.parse(req.body.book);
+		}
 		const bookId = req.params.id;
 		const book = await Book.findById(bookId);
-		// VERIFIER SI LE BOOK EST TROUVE
+
+		// VÉRIFIER SI LE BOOK EST TROUVÉ
 		if (!book) {
 			return res.status(404).json({ message: "Livre introuvable" });
 		}
-		// EXTRACTION DES DONNEES DU BODY
+
+		// EXTRACTION DES DONNÉES DU BODY
 		const { userId, title, author, year, genre } = req.body.book;
 		let imageUrl = book.imageUrl;
+
 		// STOCKAGE DE L'URL DE L'IMAGE
 		if (req.file) {
 			imageEraser(imageUrl);
-			imageUrl = `${req.protocol}://${req.get("host")}/images/${
-				req.file.filename
-			}`;
+			imageUrl = `${req.protocol}://${req.get("host")}/images/${req.file.filename}`;
 		}
-		// MISE A JOUR DU BOOK
+
+		// MISE À JOUR DU BOOK
 		book.userId = userId;
 		book.title = title;
 		book.author = author;
 		book.year = year;
 		book.genre = genre;
 		book.imageUrl = imageUrl;
-		// ENVOI DU BOOK ACTUALISE DANS LA DB
+
+		// ENVOI DU BOOK ACTUALISÉ DANS LA DB
 		await Book.findByIdAndUpdate(bookId, book);
 		console.log(title);
+
 		res.status(200).json({
 			message: "Livre mis à jour",
 			book: book,
